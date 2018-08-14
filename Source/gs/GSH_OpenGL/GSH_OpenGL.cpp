@@ -2041,19 +2041,18 @@ void CGSH_OpenGL::ProcessHostToLocalTransfer()
 		auto transferPageSize = CGsPixelFormats::GetPsmPageSize(bltBuf.nDstPsm);
 
 		uint32 pageCountX = (bltBuf.GetDstWidth() + transferPageSize.first - 1) / transferPageSize.first;
-		uint32 pageCountY = (trxReg.nRRH + transferPageSize.second - 1) / transferPageSize.second;
+		uint32 pageCountY = (trxPos.nDSAY + trxReg.nRRH + transferPageSize.second - 1) / transferPageSize.second;
 
 		uint32 pageCount = pageCountX * pageCountY;
 		uint32 transferSize = pageCount * CGsPixelFormats::PAGESIZE;
-		uint32 transferOffset = (trxPos.nDSAY / transferPageSize.second) * pageCountX * CGsPixelFormats::PAGESIZE;
 
-		m_textureCache.InvalidateRange(transferAddress + transferOffset, transferSize);
+		m_textureCache.InvalidateRange(transferAddress, transferSize);
 
 		bool isUpperByteTransfer = (bltBuf.nDstPsm == PSMT8H) || (bltBuf.nDstPsm == PSMT4HL) || (bltBuf.nDstPsm == PSMT4HH);
 		for(const auto& framebuffer : m_framebuffers)
 		{
 			if((framebuffer->m_psm == PSMCT24) && isUpperByteTransfer) continue;
-			framebuffer->m_cachedArea.Invalidate(transferAddress + transferOffset, transferSize);
+			framebuffer->m_cachedArea.Invalidate(transferAddress, transferSize);
 		}
 	}
 }
