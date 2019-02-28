@@ -67,7 +67,7 @@ void CMIPSInstructionFactory::CheckTLBValidity(bool isWrite)
 		m_codeGen->PushCst(isWrite ? MIPS_EXCEPTION_TLB_WRITE : MIPS_EXCEPTION_TLB_READ);
 		m_codeGen->PullRel(offsetof(CMIPS, m_State.nHasException));
 
-		m_codeGen->JumpTo(&HandleTLBError);
+		m_codeGen->JumpTo(reinterpret_cast<void*>(&HandleTLBError));
 	}
 	m_codeGen->EndIf();
 }
