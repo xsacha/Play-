@@ -205,7 +205,7 @@ void CCOP_SCU::BC0FL()
 void CCOP_SCU::TLBWI()
 {
 	m_codeGen->PushCtx();
-	m_codeGen->Call(&CMIPS::HandleTLBWrite, 1, Jitter::CJitter::RETURN_VALUE_NONE);
+	m_codeGen->Call(reinterpret_cast<void*>(&CMIPS::HandleTLBWrite), 1, Jitter::CJitter::RETURN_VALUE_NONE);
 }
 
 //18
