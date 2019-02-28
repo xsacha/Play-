@@ -244,6 +244,10 @@ int CSubSystem::ExecuteCpu(int quota)
 		case MIPS_EXCEPTION_SYSCALL:
 			m_os->HandleSyscall();
 			break;
+		case MIPS_EXCEPTION_TLB_READ:
+		case MIPS_EXCEPTION_TLB_WRITE:
+			m_os->HandleTLBError();
+			break;
 		case MIPS_EXCEPTION_CALLMS:
 			assert(m_EE.m_State.callMsEnabled);
 			if(m_EE.m_State.callMsEnabled)

@@ -27,6 +27,7 @@ public:
 
 protected:
 	void ComputeMemAccessAddr();
+	void CheckTLBValidity(bool);
 	void Branch(Jitter::CONDITION);
 	void BranchLikely(Jitter::CONDITION);
 

@@ -498,6 +498,8 @@ void CMA_MIPSIV::LDR()
 //20
 void CMA_MIPSIV::LB()
 {
+	CheckTLBValidity(false);
+
 	if(m_nRT == 0) return;
 
 	ComputeMemAccessAddr();
@@ -521,6 +523,8 @@ void CMA_MIPSIV::LB()
 //21
 void CMA_MIPSIV::LH()
 {
+	CheckTLBValidity(false);
+
 	if(m_nRT == 0) return;
 
 	ComputeMemAccessAddr();
@@ -544,6 +548,8 @@ void CMA_MIPSIV::LH()
 //22
 void CMA_MIPSIV::LWL()
 {
+	CheckTLBValidity(false);
+
 	if(m_nRT == 0) return;
 
 	ComputeMemAccessAddr();
@@ -581,6 +587,8 @@ void CMA_MIPSIV::LHU()
 //26
 void CMA_MIPSIV::LWR()
 {
+	CheckTLBValidity(false);
+
 	if(m_nRT == 0) return;
 
 	ComputeMemAccessAddr();
@@ -600,6 +608,8 @@ void CMA_MIPSIV::LWR()
 //27
 void CMA_MIPSIV::LWU()
 {
+	CheckTLBValidity(false);
+
 	if(m_nRT == 0) return;
 
 	ComputeMemAccessAddr();
@@ -618,6 +628,8 @@ void CMA_MIPSIV::LWU()
 //28
 void CMA_MIPSIV::SB()
 {
+	CheckTLBValidity(true);
+
 	ComputeMemAccessAddr();
 
 	m_codeGen->PushCtx();
@@ -631,6 +643,8 @@ void CMA_MIPSIV::SB()
 //29
 void CMA_MIPSIV::SH()
 {
+	CheckTLBValidity(true);
+
 	ComputeMemAccessAddr();
 
 	m_codeGen->PushCtx();
@@ -644,6 +658,7 @@ void CMA_MIPSIV::SH()
 //2A
 void CMA_MIPSIV::SWL()
 {
+	CheckTLBValidity(true);
 	ComputeMemAccessAddr();
 	m_codeGen->PushRel(offsetof(CMIPS, m_State.nGPR[m_nRT].nV[0]));
 	m_codeGen->PushCtx();
@@ -653,6 +668,8 @@ void CMA_MIPSIV::SWL()
 //2B
 void CMA_MIPSIV::SW()
 {
+	CheckTLBValidity(true);
+
 	ComputeMemAccessAddr();
 
 	m_codeGen->PushCtx();
@@ -688,6 +705,7 @@ void CMA_MIPSIV::SDR()
 //2E
 void CMA_MIPSIV::SWR()
 {
+	CheckTLBValidity(true);
 	ComputeMemAccessAddr();
 	m_codeGen->PushRel(offsetof(CMIPS, m_State.nGPR[m_nRT].nV[0]));
 	m_codeGen->PushCtx();

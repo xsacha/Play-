@@ -2,6 +2,7 @@
 #include <string.h>
 #include "MIPS.h"
 #include "COP_SCU.h"
+#include "Log.h"
 
 const char* CMIPS::m_sGPRName[] =
     {
@@ -124,4 +125,18 @@ bool CMIPS::GenerateException(uint32 nAddress)
 	m_State.nCOP0[CCOP_SCU::STATUS] |= STATUS_EXL;
 
 	return true;
+}
+
+void CMIPS::HandleTLBWrite(CMIPS* context)
+{
+	uint32 index = context->m_State.nCOP0[CCOP_SCU::INDEX];
+	uint32 entryLo0 = context->m_State.nCOP0[CCOP_SCU::ENTRYLO0];
+	uint32 entryLo1 = context->m_State.nCOP0[CCOP_SCU::ENTRYLO1];
+	uint32 entryHi = context->m_State.nCOP0[CCOP_SCU::ENTRYHI];
+	uint32 pageMask = context->m_State.nCOP0[CCOP_SCU::PAGEMASK];
+	uint32 pageSize = ((pageMask >> 13) + 1) * 0x1000;
+	uint32 pfn0 = (entryLo0 >> 6) << 12;
+	uint32 pfn1 = (entryLo1 >> 6) << 12;
+	CLog::GetInstance().Print("tlb", "index: %d, entryLo0: 0x%08x (pfn0: 0x%08x), entryLo1: 0x%08x (pfn1: 0x%08x), entryHi: 0x%08x, pageMask: 0x%08x (pageSize: 0x%08x)\r\n",
+	                          index, entryLo0, pfn0, entryLo1, pfn1, entryHi, pageMask, pageSize);
 }

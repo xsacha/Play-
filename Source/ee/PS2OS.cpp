@@ -1419,6 +1419,43 @@ uint32 CPS2OS::TranslateAddress(CMIPS*, uint32 vaddrLo)
 		//RAM access, "uncached & accelerated" as per TLB entry
 		return (vaddrLo - 0x30000000);
 	}
+	if(vaddrLo >= 0x40000000 && vaddrLo <= 0x5FFFFFFF)
+	{
+		uint32 localAddr = vaddrLo & 0x1FFFFFFF;
+		if(localAddr >= 0x00000000 && localAddr <= 0x001FFFFF)
+		{
+			//RAM
+			return 0xC00000 + (localAddr & 0x1FFFFF);
+		}
+		else if(localAddr >= 0x0F000000 && localAddr <= 0x0F00FFFF)
+		{
+			//???
+			return 0xA10000 + (localAddr & 0xFFFF);
+		}
+		else if(localAddr >= 0x0F800000 && localAddr <= 0x0F801FFF)
+		{
+			return MIPS_INVALID_PC;
+		}
+		else if(localAddr >= 0x0FC00000 && localAddr <= 0x0FC7FFFF)
+		{
+			//BIOS?
+			return 0xE80000 + (localAddr & 0x7FFFF);
+		}
+		else if(localAddr >= 0x0FFE0000 && localAddr <= 0x0FFE0FFF)
+		{
+			//Cache control
+			return 0xA02000 + (localAddr & 0xFFF);
+		}
+		else if(localAddr >= 0x1F800000 && localAddr <= 0x1F81FFFF)
+		{
+			//Scratch pad?
+			return 0xA90000 + (localAddr & 0x1FFFF);
+		}
+		else
+		{
+			return vaddrLo;
+		}
+	}
 	return vaddrLo & 0x1FFFFFFF;
 }
 
@@ -2938,6 +2975,34 @@ void CPS2OS::HandleSyscall()
 		}
 	}
 
+	m_ee.m_State.nHasException = MIPS_EXCEPTION_NONE;
+}
+
+void CPS2OS::HandleTLBError()
+{
+	//2: osSetVTLBRefillHandler(cause = 1, handler = 0x00100518);
+	//2: osSetVTLBRefillHandler(cause = 2, handler = 0x001002a0);    //Read
+	//2: osSetVTLBRefillHandler(cause = 3, handler = 0x0010047c);    //Write
+	//Clear cause
+
+	assert(m_ee.CanGenerateInterrupt());
+	m_ee.m_State.nCOP0[CCOP_SCU::CAUSE] &= 0x7C;
+	m_ee.m_State.nCOP0[CCOP_SCU::STATUS] |= CMIPS::STATUS_EXL;
+	assert(m_ee.m_State.nDelayedJumpAddr == MIPS_INVALID_PC);
+
+	//Set in exception mode
+
+	switch(m_ee.m_State.nHasException)
+	{
+	case MIPS_EXCEPTION_TLB_READ:
+		m_ee.m_State.nCOP0[CCOP_SCU::CAUSE] |= (CCOP_SCU::CAUSE_TLBL << 2);
+		m_ee.m_State.nPC = m_tlblExceptionHandler;
+		break;
+	case MIPS_EXCEPTION_TLB_WRITE:
+		m_ee.m_State.nCOP0[CCOP_SCU::CAUSE] |= (CCOP_SCU::CAUSE_TLBS << 2);
+		m_ee.m_State.nPC = m_tlbsExceptionHandler;
+		break;
+	}
 	m_ee.m_State.nHasException = MIPS_EXCEPTION_NONE;
 }
 

@@ -45,6 +45,7 @@ public:
 	void HandleInterrupt();
 	void HandleSyscall();
 	void HandleReturnFromException();
+	void HandleTLBError();
 	bool CheckVBlankFlag();
 
 	static uint32 TranslateAddress(CMIPS*, uint32);
