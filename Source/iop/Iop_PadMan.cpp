@@ -10,7 +10,7 @@ using namespace PS2;
 
 #define PADNUM (1)
 //#define MODE (0x7) //DUAL SHOCK
-#define MODE			(0x4)		//DIGITAL
+#define MODE (0x4) //DIGITAL
 #define LOG_NAME "iop_padman"
 
 #define STATE_PADDATA ("iop_padman/paddata.xml")
