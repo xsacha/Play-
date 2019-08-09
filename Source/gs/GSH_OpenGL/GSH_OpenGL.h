@@ -51,13 +51,18 @@ protected:
 private:
 	typedef CGsTextureCache<Framework::OpenGl::CTexture> TextureCache;
 
-	enum class TECHNIQUE
+	enum SHADER_IMAGE_LOCATIONS
 	{
-		STANDARD,
-		ALPHATEST_TWOPASS,
+		SHADER_IMAGE_MEMORY,
+		SHADER_IMAGE_CLUT,
+		SHADER_IMAGE_TEXTURE_SWIZZLE = 2,
+		SHADER_IMAGE_XFER_SWIZZLE = 2,
+		SHADER_IMAGE_CLUT_SWIZZLE = 2,
+		SHADER_IMAGE_FRAME_SWIZZLE,
+		SHADER_IMAGE_DEPTH_SWIZZLE,
 	};
 
-	struct SHADERCAPS : public convertible<uint32>
+	struct SHADERCAPS : public convertible<uint64>
 	{
 		unsigned int texFunction : 2; //0 - Modulate, 1 - Decal, 2 - Highlight, 3 - Hightlight2
 		unsigned int texClampS : 2;
@@ -70,14 +75,35 @@ private:
 		unsigned int hasFog : 1;
 		unsigned int hasAlphaTest : 1;
 		unsigned int alphaTestMethod : 3;
-		unsigned int padding : 15;
+		unsigned int alphaFailResult : 2;
+		unsigned int depthWriteEnabled : 1;
+		unsigned int depthTestMethod : 2;
+		unsigned int hasAlphaBlend : 1;
+		unsigned int blendFactorA : 2;
+		unsigned int blendFactorB : 2;
+		unsigned int blendFactorC : 2;
+		unsigned int blendFactorD : 2;
+		unsigned int padding1 : 1;
+		unsigned int texPsm : 6;
+		unsigned int texCpsm : 6;
+		unsigned int framePsm : 6;
+		unsigned int depthPsm : 6;
+		unsigned int padding2 : 8;
 
 		bool isIndexedTextureSource() const
 		{
 			return texSourceMode == TEXTURE_SOURCE_MODE_IDX4 || texSourceMode == TEXTURE_SOURCE_MODE_IDX8;
 		}
 	};
-	static_assert(sizeof(SHADERCAPS) == sizeof(uint32), "SHADERCAPS structure size must be 4 bytes.");
+	static_assert(sizeof(SHADERCAPS) == sizeof(SHADERCAPS::IntegerType), "SHADERCAPS structure size must be 8 bytes.");
+
+	struct CLUTLOADER_SHADERCAPS : public convertible<uint32>
+	{
+		unsigned int idx8 : 1;
+		unsigned int cpsm : 4;
+		unsigned int csm : 1;
+	};
+	static_assert(sizeof(CLUTLOADER_SHADERCAPS) == sizeof(uint32), "CLUTLOADER_SHADERCAPS structure size must be 4 bytes.");
 
 	struct RENDERSTATE
 	{
@@ -99,12 +125,16 @@ private:
 		uint64 fogColReg;
 
 		//Intermediate State
-		TECHNIQUE technique;
 		SHADERCAPS shaderCaps;
 
 		//OpenGL state
 		GLuint shaderHandle;
 		GLuint framebufferHandle;
+		GLuint framebufferTextureHandle;
+		GLuint depthbufferTextureHandle;
+		GLuint textureSwizzleTableHandle;
+		GLuint frameSwizzleTableHandle;
+		GLuint depthSwizzleTableHandle;
 		GLuint texture0Handle;
 		GLint texture0MinFilter;
 		GLint texture0MagFilter;
@@ -137,18 +167,51 @@ private:
 
 	struct FRAGMENTPARAMS
 	{
+		//
 		float textureSize[2];
 		float texelSize[2];
-		float clampMin[2];
-		float clampMax[2];
+		uint32 clampMin[2];
+		uint32 clampMax[2];
+		//
 		float texA0;
 		float texA1;
 		uint32 alphaRef;
-		float padding1;
+		uint32 depthMask;
+		//
 		float fogColor[3];
-		float padding2;
+		uint32 alphaFix;
+		//
+		uint32 colorMask;
+		uint32 textureBufPtr;
+		uint32 textureBufWidth;
+		uint32 textureCsa;
+		//
+		uint32 frameBufPtr;
+		uint32 frameBufWidth;
+		uint32 depthBufPtr;
+		uint32 depthBufWidth;
 	};
-	static_assert(sizeof(FRAGMENTPARAMS) == 0x40, "Size of FRAGMENTPARAMS must be 64 bytes.");
+	static_assert(sizeof(FRAGMENTPARAMS) == 0x60, "Size of FRAGMENTPARAMS must be 96 bytes.");
+
+	struct XFERPARAMS
+	{
+		uint32 pixelCount;
+		uint32 bufAddress;
+		uint32 bufWidth;
+		uint32 rrw;
+		uint32 dsax;
+		uint32 dsay;
+		uint32 padding[2];
+	};
+	static_assert(sizeof(XFERPARAMS) == 0x20, "Size of XFERPARAMS must be 32 bytes.");
+
+	struct CLUTLOADPARAMS
+	{
+		uint32 clutBufPtr;
+		uint32 csa;
+		uint32 padding[2];
+	};
+	static_assert(sizeof(CLUTLOADPARAMS) == 0x10, "Size of CLUTLOADPARAMS must be 16 bytes.");
 
 	enum
 	{
@@ -172,6 +235,20 @@ private:
 		uint8 nFog;
 	};
 
+	struct CLUTPARAMS : public convertible<uint64>
+	{
+		unsigned int cbp : 14;
+		unsigned int cbw : 6;
+		unsigned int cpsm : 4;
+		unsigned int csm : 1;
+		unsigned int padding : 7;
+		unsigned int csa : 5;
+		unsigned int cou : 6;
+		unsigned int cov : 10;
+		unsigned int reserved : 11;
+	};
+	static_assert(sizeof(CLUTPARAMS) == sizeof(uint64), "Size of CLUTPARAMS must be 8 bytes.");
+
 	enum
 	{
 		TEXTURE_SOURCE_MODE_NONE = 0,
@@ -188,7 +265,8 @@ private:
 		TEXTURE_CLAMP_MODE_REGION_REPEAT_SIMPLE = 3
 	};
 
-	typedef std::unordered_map<uint32, Framework::OpenGl::ProgramPtr> ShaderMap;
+	typedef std::unordered_map<SHADERCAPS::IntegerType, Framework::OpenGl::ProgramPtr> ShaderMap;
+	typedef std::unordered_map<CLUTLOADER_SHADERCAPS::IntegerType, Framework::OpenGl::ProgramPtr> ClutLoaderShaderMap;
 
 	class CPalette
 	{
@@ -243,7 +321,7 @@ private:
 		uint32 m_width;
 		uint32 m_height;
 		uint32 m_psm;
-		GLuint m_depthBuffer;
+		GLuint m_depthBufferImage;
 	};
 	typedef std::shared_ptr<CDepthbuffer> DepthbufferPtr;
 	typedef std::vector<DepthbufferPtr> DepthbufferList;
@@ -267,14 +345,16 @@ private:
 	enum class PRIM_VERTEX_ATTRIB
 	{
 		POSITION = 1,
-		COLOR = 2,
-		TEXCOORD = 3,
-		FOG = 4,
+		DEPTH,
+		COLOR,
+		TEXCOORD,
+		FOG,
 	};
 
 	struct PRIM_VERTEX
 	{
-		float x, y, z;
+		float x, y;
+		uint32 z;
 		uint32 color;
 		float s, t, q;
 		float f;
@@ -297,24 +377,37 @@ private:
 	TEXTURE_INFO PrepareTexture(const TEX0&);
 	GLuint PreparePalette(const TEX0&);
 
-	float GetZ(float);
-
 	void VertexKick(uint8, uint64);
 
 	Framework::OpenGl::ProgramPtr GetShaderFromCaps(const SHADERCAPS&);
 	Framework::OpenGl::ProgramPtr GenerateShader(const SHADERCAPS&);
 	Framework::OpenGl::CShader GenerateVertexShader(const SHADERCAPS&);
 	Framework::OpenGl::CShader GenerateFragmentShader(const SHADERCAPS&);
-	std::string GenerateTexCoordClampingSection(TEXTURE_CLAMP_MODE, const char*);
+	std::string GenerateTexCoordClampingSection(CLAMP_MODE, const char*);
+	std::string GenerateAlphaBlendABDValue(ALPHABLEND_ABD);
+	std::string GenerateAlphaBlendCValue(ALPHABLEND_C);
 	std::string GenerateAlphaTestSection(ALPHA_TEST_METHOD);
+	std::string GenerateXferProgramBase();
+	std::string GenerateMemoryAccessSection();
 
-	Framework::OpenGl::ProgramPtr GeneratePresentProgram();
+	Framework::OpenGl::ProgramPtr GeneratePresentProgram(uint32);
 	Framework::OpenGl::CBuffer GeneratePresentVertexBuffer();
 	Framework::OpenGl::CVertexArray GeneratePresentVertexArray();
 
 	Framework::OpenGl::ProgramPtr GenerateCopyToFbProgram();
 	Framework::OpenGl::CBuffer GenerateCopyToFbVertexBuffer();
 	Framework::OpenGl::CVertexArray GenerateCopyToFbVertexArray();
+
+	Framework::OpenGl::ProgramPtr GenerateXferProgramPSMCT32();
+	Framework::OpenGl::ProgramPtr GenerateXferProgramPSMCT24();
+	Framework::OpenGl::ProgramPtr GenerateXferProgramPSMCT16();
+	Framework::OpenGl::ProgramPtr GenerateXferProgramPSMT8();
+	Framework::OpenGl::ProgramPtr GenerateXferProgramPSMT4();
+	Framework::OpenGl::ProgramPtr GenerateXferProgramPSMT8H();
+	Framework::OpenGl::ProgramPtr GenerateXferProgramPSMT4HL();
+	Framework::OpenGl::ProgramPtr GenerateXferProgramPSMT4HH();
+
+	Framework::OpenGl::ProgramPtr GenerateClutLoaderProgram(const CLUTLOADER_SHADERCAPS&);
 
 	Framework::OpenGl::CVertexArray GeneratePrimVertexArray();
 	Framework::OpenGl::CBuffer GenerateUniformBlockBuffer(size_t);
@@ -339,8 +432,9 @@ private:
 
 	static bool CanRegionRepeatClampModeSimplified(uint32, uint32);
 	void FillShaderCapsFromTexture(SHADERCAPS&, const uint64&, const uint64&, const uint64&, const uint64&);
-	void FillShaderCapsFromTest(SHADERCAPS&, const uint64&);
-	TECHNIQUE GetTechniqueFromTest(const uint64&);
+	void FillShaderCapsFromFrame(SHADERCAPS&, const uint64&);
+	void FillShaderCapsFromTestAndZbuf(SHADERCAPS&, const uint64&, const uint64&);
+	void FillShaderCapsFromAlpha(SHADERCAPS&, const uint64&);
 
 	void SetupTexture(uint64, uint64, uint64, uint64, uint64);
 	static uint32 GetFramebufferBitDepth(uint32);
@@ -348,6 +442,8 @@ private:
 
 	FramebufferPtr FindFramebuffer(const FRAME&) const;
 	DepthbufferPtr FindDepthbuffer(const ZBUF&, const FRAME&) const;
+	
+	GLuint GetSwizzleTable(uint32) const;
 
 	void DumpTexture(unsigned int, unsigned int, uint32);
 
@@ -368,7 +464,6 @@ private:
 	float m_nPrimOfsY;
 	uint32 m_nTexWidth;
 	uint32 m_nTexHeight;
-	float m_nMaxZ;
 
 	bool m_forceBilinearTextures = false;
 	unsigned int m_fbScale = 1;
@@ -386,11 +481,15 @@ private:
 	void CommitFramebufferDirtyPages(const FramebufferPtr&, unsigned int, unsigned int);
 	void ResolveFramebufferMultisample(const FramebufferPtr&, uint32);
 
-	Framework::OpenGl::ProgramPtr m_presentProgram;
+	Framework::OpenGl::ProgramPtr m_presentProgramPSMCT32;
+	Framework::OpenGl::ProgramPtr m_presentProgramPSMCT16;
 	Framework::OpenGl::CBuffer m_presentVertexBuffer;
 	Framework::OpenGl::CVertexArray m_presentVertexArray;
 	GLint m_presentTextureUniform = -1;
 	GLint m_presentTexCoordScaleUniform = -1;
+	GLint m_presentFrameBufPtr = -1;
+	GLint m_presentFrameBufWidth = -1;
+	GLint m_presentScreenSize = -1;
 
 	Framework::OpenGl::ProgramPtr m_copyToFbProgram;
 	Framework::OpenGl::CTexture m_copyToFbTexture;
@@ -407,6 +506,31 @@ private:
 	Framework::OpenGl::CBuffer m_primBuffer;
 	Framework::OpenGl::CVertexArray m_primVertexArray;
 
+	Framework::OpenGl::ProgramPtr m_xferProgramPSMCT32;
+	Framework::OpenGl::ProgramPtr m_xferProgramPSMCT24;
+	Framework::OpenGl::ProgramPtr m_xferProgramPSMCT16;
+	Framework::OpenGl::ProgramPtr m_xferProgramPSMT8;
+	Framework::OpenGl::ProgramPtr m_xferProgramPSMT4;
+	Framework::OpenGl::ProgramPtr m_xferProgramPSMT8H;
+	Framework::OpenGl::ProgramPtr m_xferProgramPSMT4HL;
+	Framework::OpenGl::ProgramPtr m_xferProgramPSMT4HH;
+	static const uint32 g_xferWorkGroupSize;
+	Framework::OpenGl::CBuffer m_xferParamsBuffer;
+	Framework::OpenGl::CBuffer m_xferBuffer;
+
+	Framework::OpenGl::CTexture m_memoryTexture;
+	static const uint32 g_numSamples;
+
+	Framework::OpenGl::CBuffer m_clutLoadParamsBuffer;
+	Framework::OpenGl::CTexture m_clutTexture;
+
+	Framework::OpenGl::CTexture m_swizzleTexturePSMCT32;
+	Framework::OpenGl::CTexture m_swizzleTexturePSMCT16;
+	Framework::OpenGl::CTexture m_swizzleTexturePSMCT16S;
+	Framework::OpenGl::CTexture m_swizzleTexturePSMT8;
+	Framework::OpenGl::CTexture m_swizzleTexturePSMT4;
+	Framework::OpenGl::CTexture m_swizzleTexturePSMZ32;
+
 	VERTEX m_VtxBuffer[3];
 	int m_nVtxCount;
 
@@ -414,9 +538,11 @@ private:
 	unsigned int m_primitiveType;
 	bool m_drawingToDepth = false;
 
+	CLUTPARAMS m_lastClutKey;
+	bool m_lastClutKeyValid = false;
+
 	static const GLenum g_nativeClampModes[CGSHandler::CLAMP_MODE_MAX];
 	static const unsigned int g_shaderClampModes[CGSHandler::CLAMP_MODE_MAX];
-	static const unsigned int g_alphaTestInverse[CGSHandler::ALPHA_TEST_MAX];
 
 	TEXTUREUPDATER m_textureUpdater[CGSHandler::PSM_MAX];
 
@@ -436,6 +562,7 @@ private:
 	};
 
 	ShaderMap m_shaders;
+	ClutLoaderShaderMap m_clutLoaders;
 	RENDERSTATE m_renderState;
 	uint32 m_validGlState = 0;
 	VERTEXPARAMS m_vertexParams;
