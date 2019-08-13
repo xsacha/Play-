@@ -625,6 +625,7 @@ void CGSHandler::WriteRegisterMassivelyImpl(const MASSIVEWRITE_INFO& massiveWrit
 
 	assert(m_transferCount != 0);
 	m_transferCount--;
+	m_drawCallCount++;
 }
 
 void CGSHandler::BeginTransfer()
